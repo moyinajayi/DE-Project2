@@ -1,0 +1,62 @@
+version: "3.9"
+
+services:
+  # ── Full Pipeline DAG (all steps in order) ────────────────────────────────
+  pipeline:
+    build: .
+    container_name: vancouver-crime-pipeline
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/creds/gcpserviceacccountcreds.json
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID}
+      - PREFECT_API_URL=${PREFECT_API_URL:-http://prefect-server:4200/api}
+    volumes:
+      - ./creds:/app/creds:ro
+      - ./data:/app/data
+    command: python flows/pipeline_dag.py
+
+  # ── Pipeline: Ingest to GCS (standalone) ──────────────────────────────────────────────
+  ingest:
+    build: .
+    container_name: vancouver-crime-ingest
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/creds/gcpserviceacccountcreds.json
+      - PREFECT_API_URL=${PREFECT_API_URL:-http://prefect-server:4200/api}
+    volumes:
+      - ./creds:/app/creds:ro
+      - ./data:/app/data
+    command: python flows/ingest_to_gcs.py
+
+  # ── Pipeline: GCS to BigQuery (standalone) ────────────────────────────────
+  load-bq:
+    build: .
+    container_name: vancouver-crime-load-bq
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/creds/gcpserviceacccountcreds.json
+      - PREFECT_API_URL=${PREFECT_API_URL:-http://prefect-server:4200/api}
+    volumes:
+      - ./creds:/app/creds:ro
+      - ./data:/app/data
+    command: python flows/gcs_to_bq.py
+
+  # ── dbt transformations (standalone) ──────────────────────────────────────────────────
+  dbt:
+    build: .
+    container_name: vancouver-crime-dbt
+    working_dir: /app/dbt
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/creds/gcpserviceacccountcreds.json
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID}
+    volumes:
+      - ./creds:/app/creds:ro
+    command: dbt run --profiles-dir .
+
+  # ── Streamlit Dashboard ───────────────────────────────────────────────────
+  dashboard:
+    build: .
+    container_name: vancouver-crime-dashboard
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./creds:/app/creds:ro
+      - ./dashboard/.streamlit:/app/dashboard/.streamlit:ro
+    command: streamlit run dashboard/app.py --server.port=8501 --server.address=0.0.0.0

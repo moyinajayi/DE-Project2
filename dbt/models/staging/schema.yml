@@ -1,0 +1,10 @@
+version: 2
+
+sources:
+  - name: staging
+    database: "{{ env_var('GCP_PROJECT_ID') }}"
+    schema: vancouver_crime
+
+    tables:
+      - name: vancouver_crime_raw
+        description: "Raw Vancouver crime data loaded from GCS Parquet"

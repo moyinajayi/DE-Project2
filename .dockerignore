@@ -1,0 +1,7 @@
+terraform/
+.git/
+.gitignore
+*.md
+data/
+creds/
+.env*

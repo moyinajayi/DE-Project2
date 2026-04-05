@@ -1,0 +1,32 @@
+version: 2
+
+models:
+  - name: fact_crime_monthly
+    description: "Monthly crime counts aggregated by crime type and neighbourhood"
+    columns:
+      - name: crime_type
+        description: "Category of crime (e.g., Theft from Vehicle, Break and Enter)"
+      - name: neighbourhood
+        description: "Vancouver neighbourhood where the crime occurred"
+      - name: year
+        description: "Year of the crime"
+      - name: month
+        description: "Month of the crime (1-12)"
+      - name: month_start
+        description: "First day of the month (for time-series plotting)"
+      - name: crime_count
+        description: "Number of crime incidents in this group"
+
+  - name: dim_crime_type_summary
+    description: "Summary statistics per crime type for categorical distribution chart"
+    columns:
+      - name: crime_type
+        description: "Category of crime"
+      - name: total_incidents
+        description: "Total number of incidents for this crime type"
+      - name: earliest_incident
+        description: "Date of the earliest recorded incident"
+      - name: latest_incident
+        description: "Date of the most recent recorded incident"
+      - name: neighbourhoods_affected
+        description: "Number of distinct neighbourhoods with this crime type"
