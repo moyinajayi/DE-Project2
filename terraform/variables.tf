@@ -17,7 +17,7 @@ variable "location" {
 
 variable "bq_dataset_name" {
   description = "BigQuery Dataset that raw data (from GCS) will be written to"
-  default     = "vancouver_crime"
+  default     = "chicago_crime"
   type        = string
 }
 

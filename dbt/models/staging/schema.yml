@@ -3,8 +3,30 @@ version: 2
 sources:
   - name: staging
     database: "{{ env_var('GCP_PROJECT_ID') }}"
-    schema: vancouver_crime
+    schema: chicago_crime
 
     tables:
-      - name: vancouver_crime_raw
-        description: "Raw Vancouver crime data loaded from GCS Parquet"
+      - name: chicago_crime_raw
+        description: "Raw Chicago crime data loaded from GCS Parquet"
+
+models:
+  - name: stg_chicago_crime
+    description: "Cleaned and typed staging view of Chicago crime data"
+    columns:
+      - name: crime_id
+        description: "Unique crime record ID"
+        tests:
+          - not_null
+          - unique
+      - name: crime_type
+        description: "Primary crime category (e.g., THEFT, BATTERY)"
+        tests:
+          - not_null
+      - name: crime_date
+        description: "Date the crime occurred"
+        tests:
+          - not_null
+      - name: district
+        description: "Chicago police district number"
+      - name: arrest
+        description: "Whether an arrest was made"

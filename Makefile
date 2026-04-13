@@ -1,15 +1,15 @@
-.PHONY: help setup infra infra-destroy blocks ingest load-bq dbt-run pipeline dashboard clean
+.PHONY: help setup infra infra-destroy blocks ingest load-bq dbt-run dbt-test pipeline stream-up stream-produce stream-consume dashboard clean
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
 		awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
-# ── Prerequisites ───────────────────────────────────────────────────────────
+# ── Prerequisites ───────────────────────────────────────────────────────
 
 setup: ## Install Python dependencies
 	pip install -r requirements.txt
 
-# ── Infrastructure ──────────────────────────────────────────────────────────
+# ── Infrastructure ──────────────────────────────────────────────────────
 
 infra: ## Provision GCS + BigQuery with Terraform
 	cd terraform && terraform init && terraform apply -auto-approve
@@ -17,41 +17,53 @@ infra: ## Provision GCS + BigQuery with Terraform
 infra-destroy: ## Tear down all Terraform resources
 	cd terraform && terraform destroy -auto-approve
 
-# ── Prefect Blocks (run once) ──────────────────────────────────────────────
+# ── Prefect Blocks (run once) ──────────────────────────────────────────
 
 blocks: ## Create Prefect GCS & GCP credential blocks
 	cd flows && python setup_blocks.py
 
-# ── Pipeline Steps (individual) ─────────────────────────────────────────────
+# ── Batch Pipeline Steps ────────────────────────────────────────────────
 
-ingest: ## Step 1: Download CSV → clean → Parquet → GCS
+ingest: ## Step 1: Download CSV -> clean -> Parquet -> GCS
 	cd flows && python ingest_to_gcs.py
 
-load-bq: ## Step 2: GCS → BigQuery raw table
+load-bq: ## Step 2: GCS -> BigQuery raw table
 	cd flows && python gcs_to_bq.py
 
 dbt-run: ## Step 3: Run dbt transformations
 	cd dbt && dbt run --profiles-dir .
 
-# ── Full Pipeline ───────────────────────────────────────────────────────────
+dbt-test: ## Step 4: Run dbt tests (validates data quality)
+	cd dbt && dbt test --profiles-dir .
 
-pipeline: ## Run full DAG (ingest → load → transform)
+pipeline: ## Run full batch DAG (ingest -> load -> transform -> test)
 	cd flows && python pipeline_dag.py
 
-# ── Docker Pipeline ─────────────────────────────────────────────────────────
+# ── Streaming ───────────────────────────────────────────────────────────
 
-docker-pipeline: ## Run full pipeline in Docker
+stream-up: ## Start Kafka + Zookeeper
+	docker compose up -d zookeeper kafka
+
+stream-produce: ## Run Kafka producer (recent crime events)
+	docker compose run --rm kafka-producer
+
+stream-consume: ## Run Kafka consumer (events -> BigQuery)
+	docker compose run --rm kafka-consumer
+
+# ── Docker Pipeline ─────────────────────────────────────────────────────
+
+docker-pipeline: ## Run full batch pipeline in Docker
 	docker compose run --rm pipeline
 
 docker-dashboard: ## Start Streamlit dashboard in Docker
 	docker compose up dashboard
 
-# ── Dashboard ───────────────────────────────────────────────────────────────
+# ── Dashboard ───────────────────────────────────────────────────────────
 
 dashboard: ## Start Streamlit dashboard locally
 	streamlit run dashboard/app.py
 
-# ── Cleanup ─────────────────────────────────────────────────────────────────
+# ── Cleanup ─────────────────────────────────────────────────────────────
 
 clean: ## Remove local data files
 	rm -rf data/

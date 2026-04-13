@@ -9,3 +9,4 @@ streamlit>=1.30
 db-dtypes>=1.2
 dbt-core>=1.7
 dbt-bigquery>=1.7
+confluent-kafka>=2.3

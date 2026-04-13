@@ -1,33 +1,41 @@
 """
-Prefect DAG: End-to-end Vancouver Crime Data Pipeline.
+Prefect DAG: End-to-end Chicago Crime Data Pipeline.
 
-This is the parent orchestration flow (DAG) that chains all pipeline steps
-in the correct order:
-
-    1. Ingest CSV → clean → Parquet → GCS  (data lake)
-    2. GCS Parquet → BigQuery raw table     (data warehouse)
-    3. dbt run → transformed tables         (analytics-ready)
-
-Scheduled to run weekly on Mondays at 6:00 AM UTC.
+Chains all pipeline steps in order:
+    1. Ingest CSV -> clean -> Parquet -> GCS  (data lake)
+    2. GCS Parquet -> BigQuery raw table      (data warehouse)
+    3. dbt run -> transformed tables          (analytics-ready)
 """
 
+import os
 import subprocess
+from pathlib import Path
 
 from prefect import flow, task
-from prefect.tasks import task_input_hash
-from datetime import timedelta
 
 from ingest_to_gcs import ingest_to_gcs
 from gcs_to_bq import gcs_to_bq
 
 
+def _resolve_dbt_dir() -> str:
+    """Resolve dbt project directory — works in Docker (/app/dbt) and locally."""
+    if Path("/app/dbt").exists():
+        return "/app/dbt"
+    # Local: dbt dir is sibling of flows/
+    local_dbt = Path(__file__).resolve().parent.parent / "dbt"
+    if local_dbt.exists():
+        return str(local_dbt)
+    raise FileNotFoundError("Cannot find dbt project directory")
+
+
 @task(log_prints=True)
 def run_dbt_transformations() -> None:
     """Run dbt models to build transformed tables in BigQuery."""
-    print("Running dbt transformations ...")
+    dbt_dir = _resolve_dbt_dir()
+    print(f"Running dbt transformations from {dbt_dir} ...")
     result = subprocess.run(
         ["dbt", "run", "--profiles-dir", "."],
-        cwd="/app/dbt",
+        cwd=dbt_dir,
         capture_output=True,
         text=True,
     )
@@ -38,33 +46,50 @@ def run_dbt_transformations() -> None:
     print("dbt transformations complete.")
 
 
-@flow(name="Vancouver Crime Pipeline DAG", log_prints=True)
-def vancouver_crime_pipeline():
+@task(log_prints=True)
+def run_dbt_tests() -> None:
+    """Run dbt tests to validate transformed data."""
+    dbt_dir = _resolve_dbt_dir()
+    print(f"Running dbt tests from {dbt_dir} ...")
+    result = subprocess.run(
+        ["dbt", "test", "--profiles-dir", "."],
+        cwd=dbt_dir,
+        capture_output=True,
+        text=True,
+    )
+    print(result.stdout)
+    if result.returncode != 0:
+        print(result.stderr)
+        raise RuntimeError(f"dbt test failed with exit code {result.returncode}")
+    print("dbt tests passed.")
+
+
+@flow(name="Chicago Crime Pipeline DAG", log_prints=True)
+def chicago_crime_pipeline():
     """
     Full DAG orchestrating the end-to-end pipeline:
-
-        [Ingest to GCS] → [Load to BigQuery] → [dbt Transform]
-
-    Each step depends on the previous one completing successfully.
+        [Ingest to GCS] -> [Load to BigQuery] -> [dbt Transform]
     """
 
-    # Step 1: Download → Clean → Upload to GCS
     print("=" * 60)
     print("STEP 1: Ingesting data to GCS (Data Lake)")
     print("=" * 60)
     ingest_to_gcs()
 
-    # Step 2: GCS → BigQuery raw table
     print("=" * 60)
     print("STEP 2: Loading data from GCS to BigQuery (Warehouse)")
     print("=" * 60)
     gcs_to_bq()
 
-    # Step 3: dbt transformations
     print("=" * 60)
     print("STEP 3: Running dbt transformations")
     print("=" * 60)
     run_dbt_transformations()
+
+    print("=" * 60)
+    print("STEP 4: Running dbt tests")
+    print("=" * 60)
+    run_dbt_tests()
 
     print("=" * 60)
     print("PIPELINE COMPLETE")
@@ -72,4 +97,4 @@ def vancouver_crime_pipeline():
 
 
 if __name__ == "__main__":
-    vancouver_crime_pipeline()
+    chicago_crime_pipeline()

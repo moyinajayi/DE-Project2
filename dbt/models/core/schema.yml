@@ -2,31 +2,54 @@ version: 2
 
 models:
   - name: fact_crime_monthly
-    description: "Monthly crime counts aggregated by crime type and neighbourhood"
+    description: "Monthly crime counts aggregated by crime type and district"
     columns:
       - name: crime_type
-        description: "Category of crime (e.g., Theft from Vehicle, Break and Enter)"
-      - name: neighbourhood
-        description: "Vancouver neighbourhood where the crime occurred"
+        description: "Category of crime (e.g., THEFT, BATTERY, NARCOTICS)"
+        tests:
+          - not_null
+      - name: district
+        description: "Chicago police district number"
       - name: year
         description: "Year of the crime"
+        tests:
+          - not_null
       - name: month
         description: "Month of the crime (1-12)"
+        tests:
+          - not_null
       - name: month_start
         description: "First day of the month (for time-series plotting)"
+        tests:
+          - not_null
       - name: crime_count
         description: "Number of crime incidents in this group"
+        tests:
+          - not_null
+      - name: arrest_count
+        description: "Number of incidents resulting in arrest"
+      - name: arrest_rate_pct
+        description: "Percentage of incidents resulting in arrest"
 
   - name: dim_crime_type_summary
     description: "Summary statistics per crime type for categorical distribution chart"
     columns:
       - name: crime_type
         description: "Category of crime"
+        tests:
+          - not_null
+          - unique
       - name: total_incidents
         description: "Total number of incidents for this crime type"
+        tests:
+          - not_null
+      - name: total_arrests
+        description: "Total arrests for this crime type"
+      - name: arrest_rate_pct
+        description: "Arrest rate percentage"
       - name: earliest_incident
         description: "Date of the earliest recorded incident"
       - name: latest_incident
         description: "Date of the most recent recorded incident"
-      - name: neighbourhoods_affected
-        description: "Number of distinct neighbourhoods with this crime type"
+      - name: districts_affected
+        description: "Number of distinct districts with this crime type"

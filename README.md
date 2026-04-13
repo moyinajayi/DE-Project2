@@ -1,49 +1,55 @@
-# Vancouver Crime Data Pipeline
+# Chicago Crime Data Pipeline
 
-An end-to-end batch data pipeline that ingests, transforms, and visualizes Vancouver Police Department crime data.
+An end-to-end data pipeline (batch + streaming) that ingests, transforms, and visualizes Chicago crime data from the City of Chicago Open Data Portal.
 
 ## Problem Statement
 
-Public safety is a top priority for cities, yet raw crime data published by police departments is often too large and unstructured for citizens, journalists, or city planners to draw actionable insights from. The Vancouver Police Department publishes over **650,000 crime incident records** spanning multiple years, but this data sits as a flat CSV with no analytical structure.
+Public safety is a top priority for cities, yet raw crime data is often too large and unstructured for citizens, journalists, or analysts to draw actionable insights from. The City of Chicago publishes over **8.5 million crime incident records** spanning 2001 to present, updated daily — but this data sits as a flat CSV/API with no analytical structure.
 
-**This project solves that problem** by building an automated, end-to-end batch data pipeline that:
+**This project solves that problem** by building an automated, end-to-end data pipeline that:
 
-1. **Ingests** the raw VPD crime data from Vancouver Open Data into a cloud data lake (GCS)
-2. **Loads** the data into a cloud data warehouse (BigQuery) with optimized partitioning and clustering
-3. **Transforms** the raw records into analytics-ready tables using dbt (dimensional modeling)
-4. **Visualizes** the results in an interactive Streamlit dashboard
+1. **Batch ingests** the full Chicago crime dataset into a cloud data lake (GCS)
+2. **Streams** recent crime events via Kafka for near-real-time processing
+3. **Loads** the data into a cloud data warehouse (BigQuery) with optimized partitioning and clustering
+4. **Transforms** the raw records into analytics-ready tables using dbt (dimensional modeling)
+5. **Visualizes** the results in an interactive Streamlit dashboard
 
-The dashboard answers two key questions:
-- **What types of crime are most prevalent in Vancouver?** — helping identify which categories (theft, break & enter, mischief, etc.) need the most attention
-- **How have crime trends changed over time?** — revealing seasonal patterns, year-over-year changes, and whether crime is increasing or decreasing across neighbourhoods
+The dashboard answers key questions:
+- **What types of crime are most prevalent in Chicago?** — helping identify which categories (theft, battery, narcotics, etc.) need the most attention
+- **How have crime trends changed over time?** — revealing seasonal patterns, year-over-year changes, and arrest rates across districts
+- **What is the arrest rate by crime type?** — showing police effectiveness per category
 
-The pipeline runs on a weekly schedule via Prefect, ensuring the dashboard always reflects the latest available data.
+The batch pipeline runs on a weekly schedule via Prefect, while the Kafka streaming pipeline can process recent events in near-real-time.
 
 ## Architecture
 
 ```
-                    ┌─────────────────────────────────────┐
-                    │      Prefect DAG (pipeline_dag.py)  │
-                    │         Scheduled: Weekly           │
-                    └─────────────┬───────────────────────┘
-                                  │
-              ┌───────────────────┼───────────────────┐
-              ▼                   ▼                   ▼
-     ┌────────────────┐  ┌────────────────┐  ┌────────────────┐
-     │  Step 1: Ingest │  │  Step 2: Load  │  │  Step 3: dbt   │
-     │  CSV → Parquet  │  │  GCS → BigQuery│  │  Transform     │
-     │  → GCS          │  │  (raw table)   │  │  (fact/dim)    │
-     └────────────────┘  └────────────────┘  └────────────────┘
-              │                   │                   │
-              ▼                   ▼                   ▼
-         GCS Bucket         BigQuery Raw        BigQuery Tables
-        (Data Lake)          Table            (Analytics-Ready)
-                                                      │
-                                                      ▼
-                                              ┌────────────────┐
-                                              │   Streamlit    │
-                                              │   Dashboard    │
-                                              └────────────────┘
+ ┌──────────────────── BATCH PATH ────────────────────────────────────┐
+ │                                                                     │
+ │   ┌────────────────┐    ┌────────────────┐    ┌────────────────┐   │
+ │   │  Ingest CSV     │    │  GCS → BigQuery │    │  dbt Transform │   │
+ │   │  → Parquet → GCS│───▶│  (raw table)    │───▶│  (fact/dim)    │   │
+ │   └────────────────┘    └────────────────┘    └────────────────┘   │
+ │           ▲                                            │            │
+ │    Prefect DAG                                         ▼            │
+ │    (weekly schedule)                           BigQuery Tables      │
+ │                                              (analytics-ready)      │
+ └─────────────────────────────────────────────────────────────────────┘
+
+ ┌──────────────────── STREAMING PATH ────────────────────────────────┐
+ │                                                                     │
+ │   ┌────────────────┐    ┌────────────────┐    ┌────────────────┐   │
+ │   │ Socrata API     │    │     Kafka       │    │  Consumer →    │   │
+ │   │ → Producer      │───▶│  (topic)        │───▶│  BigQuery      │   │
+ │   └────────────────┘    └────────────────┘    └────────────────┘   │
+ └─────────────────────────────────────────────────────────────────────┘
+
+                                    │
+                                    ▼
+                           ┌────────────────┐
+                           │   Streamlit    │
+                           │   Dashboard    │
+                           └────────────────┘
 ```
 
 ## Tech Stack
@@ -54,37 +60,50 @@ The pipeline runs on a weekly schedule via Prefect, ensuring the dashboard alway
 | Data Lake | Google Cloud Storage (GCS) |
 | Data Warehouse | BigQuery |
 | Workflow Orchestration | Prefect |
+| Stream Processing | Apache Kafka (Confluent) |
 | Transformations | dbt |
 | Dashboard | Streamlit |
 | Containerization | Docker / Docker Compose |
 
 ## Dataset
 
-**Vancouver Police Department Crime Data**
-- Source: [Vancouver Open Data](https://data.vancouver.ca/)
-- ~650,000+ records of crime incidents
-- Columns: `TYPE`, `YEAR`, `MONTH`, `DAY`, `HOUR`, `MINUTE`, `HUNDRED_BLOCK`, `NEIGHBOURHOOD`, `X`, `Y`
-- Updated regularly with recent crime reports
+**City of Chicago — Crimes (2001 to Present)**
+- Source: [Chicago Open Data Portal](https://data.cityofchicago.org/Public-Safety/Crimes-2001-to-Present/ijzp-q8t2)
+- **8.5 million+** records, updated daily
+- Columns: `ID`, `Case Number`, `Date`, `Block`, `Primary Type`, `Description`, `Location Description`, `Arrest`, `Domestic`, `Beat`, `District`, `Ward`, `Community Area`, `Year`, `Latitude`, `Longitude`
+- Socrata API supports both full CSV download and paginated JSON queries
 
 ## Dashboard
 
 Two tiles as required:
 
-1. **Crime Distribution by Type** — Bar chart showing total incidents per crime category (e.g., Theft from Vehicle, Break and Enter, Mischief)
+1. **Crime Distribution by Type** — Bar chart showing total incidents per crime category (e.g., THEFT, BATTERY, CRIMINAL DAMAGE, NARCOTICS)
 2. **Monthly Crime Trends** — Line chart showing crime volume over time, broken down by crime type
 
-Interactive filters: crime type selection, year range slider.
+Interactive filters: crime type multi-select (default top 10), year range slider.
 
 ## Data Warehouse Optimization
 
-BigQuery tables are **partitioned and clustered** for query performance and cost:
+BigQuery tables use three optimization strategies: **partitioning**, **clustering**, and **search indexes**.
+
+### Partitioning & Clustering
 
 | Table | Partition | Cluster | Rationale |
 |---|---|---|---|
-| `fact_crime_monthly` | `month_start` (monthly) | `crime_type`, `neighbourhood` | Dashboard temporal chart filters by month range; categorical chart and neighbourhood drill-downs filter/group by type and neighbourhood. Partitioning reduces scanned data for time-range queries; clustering enables block-level pruning on the most-filtered columns. |
-| `dim_crime_type_summary` | None (small table) | `crime_type` | Only ~15 rows — partitioning would add overhead. Clustering by crime_type aligns with the categorical bar chart query. |
+| `chicago_crime_raw` | `date` (monthly) | `primary_type`, `district` | Raw table is partitioned by crime date and clustered by type/district so downstream queries (dbt, ad-hoc) scan fewer bytes. |
+| `fact_crime_monthly` | `month_start` (monthly) | `crime_type`, `district` | Dashboard temporal chart filters by month range; categorical chart and district drill-downs filter/group by type and district. |
+| `dim_crime_type_summary` | None (small table) | `crime_type` | Only ~35 rows — partitioning would add overhead. Clustering by crime_type aligns with the categorical bar chart query. |
 
-This is configured in the dbt model configs (`partition_by` and `cluster_by`) rather than raw DDL, so the optimization is version-controlled and reproducible.
+### Search Indexes
+
+BigQuery search indexes are created via dbt `post_hook` for fast text lookups:
+
+| Table | Index | Column | Purpose |
+|---|---|---|---|
+| `fact_crime_monthly` | `idx_fact_crime_type` | `crime_type` | Fast filtered aggregations by crime type |
+| `dim_crime_type_summary` | `idx_dim_crime_type` | `crime_type` | Fast lookups on crime type dimension |
+
+This is configured in the dbt model configs (`partition_by`, `cluster_by`, and `post_hook`) rather than raw DDL, so the optimization is version-controlled and reproducible.
 
 ## Setup & Reproduction
 
@@ -100,7 +119,7 @@ A `Makefile` is provided for convenience. Run `make help` to see all available c
   - BigQuery Admin
   - Storage Admin
 
-### Quick Start (5 commands)
+### Quick Start
 
 ```bash
 # 1. Clone and configure
@@ -114,23 +133,27 @@ make infra                        # Terraform: creates GCS bucket + BigQuery dat
 
 # 3. Install dependencies & configure Prefect blocks
 make setup                        # pip install -r requirements.txt
-make blocks                       # creates Prefect GCS/GCP blocks (edit setup_blocks.py first)
+make blocks                       # creates Prefect GCS/GCP blocks
 
-# 4. Run the full pipeline
-make pipeline                     # Ingest → Load → Transform (or: make docker-pipeline)
+# 4. Run the full batch pipeline
+make pipeline                     # Ingest → Load → Transform
 
-# 5. Launch the dashboard
+# 5. (Optional) Run streaming pipeline
+make stream-up                    # Start Kafka + Zookeeper
+make stream-produce               # Produce recent crime events to Kafka
+make stream-consume               # Consume events → BigQuery
+
+# 6. Launch the dashboard
 make dashboard                    # opens http://localhost:8501
 ```
 
 ### Detailed Steps
 
-### Step 1: Infrastructure (Terraform)
+#### Step 1: Infrastructure (Terraform)
 
 ```bash
 cd terraform
 
-# Create a terraform.tfvars file:
 cat > terraform.tfvars <<EOF
 project          = "your-gcp-project-id"
 gcs_bucket_name  = "your-unique-bucket-name"
@@ -141,69 +164,64 @@ terraform plan
 terraform apply
 ```
 
-### Step 2: Configure Environment
+#### Step 2: Configure Environment
 
 ```bash
-# Copy and edit environment variables
 cp .env.example .env
 # Edit .env with your GCP project ID
 
-# Place your GCP service account key at:
 mkdir -p creds
 cp /path/to/your/service-account.json creds/service-account.json
 ```
 
-### Step 3: Set Up Prefect Blocks
+#### Step 3: Set Up Prefect Blocks
 
 ```bash
 pip install -r requirements.txt
-
 # Edit flows/setup_blocks.py with your bucket name and project ID
 python flows/setup_blocks.py
 ```
 
-### Step 4: Run the Pipeline
+#### Step 4: Run the Batch Pipeline
+
+The full DAG runs 4 steps in order: **Ingest → Load → dbt Transform → dbt Test**
 
 ```bash
-# Option A: Full DAG — runs all 3 steps in order (recommended)
-docker compose run pipeline
+# Option A: Full DAG (recommended — runs all 4 steps)
+make pipeline
 
-# Option B: Run individual steps separately
-docker compose run ingest      # Step 1: Download data → GCS
-docker compose run load-bq     # Step 2: GCS → BigQuery
-docker compose run dbt         # Step 3: dbt transformations
+# Option B: Docker
+docker compose run --rm pipeline
 
-# Option C: Run locally
-python flows/pipeline_dag.py   # Full DAG
-# ... or individual steps:
-python flows/ingest_to_gcs.py
-python flows/gcs_to_bq.py
-cd dbt && dbt run --profiles-dir .
+# Option C: Individual steps locally
+make ingest       # Step 1: Download CSV → Parquet → GCS
+make load-bq      # Step 2: GCS → BigQuery (partitioned + clustered)
+make dbt-run      # Step 3: dbt transformations (staging view + core tables)
+make dbt-test     # Step 4: dbt tests (not_null, unique, data quality)
 ```
 
-### Step 4b (Optional): Schedule the Pipeline
+#### Step 5: Run the Streaming Pipeline
 
 ```bash
-# Register a weekly deployment with Prefect (runs Mondays at 6 AM Vancouver time)
-python flows/deploy.py
+# Start Kafka infrastructure
+make stream-up
 
-# Start a Prefect agent to pick up scheduled runs
-prefect agent start -q default
+# In separate terminals:
+make stream-produce    # Fetches recent records from Socrata API → Kafka
+make stream-consume    # Kafka → BigQuery streaming table
 ```
 
-### Step 5: Launch Dashboard
+#### Step 6: Launch Dashboard
 
 ```bash
-# Create Streamlit secrets
 mkdir -p dashboard/.streamlit
 cp dashboard/.streamlit/secrets.toml.example dashboard/.streamlit/secrets.toml
 # Edit secrets.toml with your project ID and credentials path
 
-# Option A: Docker Compose
+# Docker:
 docker compose up dashboard
-# Open http://localhost:8501
 
-# Option B: Run locally
+# Or locally:
 streamlit run dashboard/app.py
 ```
 
@@ -214,31 +232,34 @@ streamlit run dashboard/app.py
 │   ├── main.tf
 │   ├── variables.tf
 │   └── outputs.tf
-├── flows/                  # Prefect orchestration
+├── flows/                  # Prefect batch orchestration
 │   ├── pipeline_dag.py     # Parent DAG — chains all steps in order
 │   ├── deploy.py           # Register scheduled deployment with Prefect
 │   ├── ingest_to_gcs.py    # Step 1: Download CSV → clean → Parquet → GCS
 │   ├── gcs_to_bq.py        # Step 2: GCS Parquet → BigQuery raw table
 │   └── setup_blocks.py     # One-time Prefect block configuration
-├── dbt/                    # Data transformations
+├── streaming/              # Kafka streaming pipeline
+│   ├── producer.py         # Socrata API → Kafka topic
+│   └── consumer.py         # Kafka topic → BigQuery
+├── dbt/                    # Data transformations (dbt)
 │   ├── dbt_project.yml
 │   ├── profiles.yml
 │   └── models/
 │       ├── staging/
-│       │   ├── stg_vancouver_crime.sql
-│       │   └── schema.yml
+│       │   ├── stg_chicago_crime.sql   # Staging view with type casting
+│       │   └── schema.yml              # Source definition + column tests
 │       └── core/
-│           ├── fact_crime_monthly.sql
-│           ├── dim_crime_type_summary.sql
-│           └── schema.yml
+│           ├── fact_crime_monthly.sql   # Partitioned + clustered + indexed
+│           ├── dim_crime_type_summary.sql  # Clustered + indexed
+│           └── schema.yml              # Model docs + column tests
 ├── dashboard/              # Streamlit dashboard
 │   ├── app.py
 │   └── .streamlit/
 │       └── secrets.toml.example
 ├── Dockerfile
 ├── docker-compose.yml
-├── Makefile                # Quick commands: make pipeline, make dashboard, etc.
+├── Makefile                # Quick commands: make pipeline, make stream-up, etc.
 ├── requirements.txt
+├── .env.example            # Template for environment variables
 └── README.md
-```
 ```
