@@ -8,11 +8,11 @@ Public safety is a top priority for cities, yet raw crime data is often too larg
 
 **This project solves that problem** by building an automated, end-to-end data pipeline that:
 
-1. **Batch ingests** the full Chicago crime dataset into a cloud data lake (GCS)
-2. **Streams** recent crime events via Kafka for near-real-time processing
-3. **Loads** the data into a cloud data warehouse (BigQuery) with optimized partitioning and clustering
-4. **Transforms** the raw records into analytics-ready tables using dbt (dimensional modeling)
-5. **Visualizes** the results in an interactive Streamlit dashboard
+1. **Batch ingests** 8.5 M+ Chicago crime records into Google Cloud Storage via a Prefect-orchestrated DAG (4 chained steps, weekly cron schedule)
+2. **Streams** recent crime events through a Kafka producer/consumer pipeline into BigQuery for near-real-time processing
+3. **Loads** data into BigQuery with monthly partitioning by date and clustering by `primary_type`/`district`, managed via Terraform IaC
+4. **Transforms** raw records into analytics-ready tables using dbt — 1 staging view + 2 core tables (fact + dim) with 12 automated quality tests
+5. **Visualises** results in an interactive Streamlit dashboard with 4 KPI metrics, 5 chart tiles, and 2 calculated fields (arrest rate %, YoY % change)
 
 The dashboard answers key questions:
 - **What types of crime are most prevalent in Chicago?** — helping identify which categories (theft, battery, narcotics, etc.) need the most attention
@@ -273,11 +273,3 @@ streamlit run dashboard/app.py
 ├── .env.example            # Template for environment variables
 └── README.md
 ```
-
-## What This Project Does
-
-1. **Ingests** 8.5 M+ Chicago crime records via a Prefect-orchestrated batch pipeline and a Kafka streaming pipeline.
-2. **Stores** raw and transformed data in Google Cloud Storage and BigQuery, with Terraform-managed infrastructure.
-3. **Transforms** data using dbt (staging view + fact/dim tables) with partitioning, clustering, and 12 automated quality tests.
-4. **Visualises** crime trends through an interactive Streamlit dashboard with KPI metrics, temporal charts, and district breakdowns.
-5. **Reproduces** end-to-end with a single Makefile, Docker Compose, `.env.example`, and this README.
