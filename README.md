@@ -274,17 +274,10 @@ streamlit run dashboard/app.py
 └── README.md
 ```
 
-## Evaluation Criteria Mapping
+## What This Project Does
 
-How each project component maps to the grading rubric:
-
-| # | Criterion | What This Project Does | Evidence |
-|---|---|---|---|
-| 1 | **Problem description** (2 pts) | Clear problem statement with 3 specific questions the dashboard answers | README § Problem Statement |
-| 2 | **Cloud** (4 pts) | Terraform provisions GCS bucket + BigQuery dataset; IaC is version-controlled | `terraform/main.tf`, `terraform/variables.tf` |
-| 3 | **Data ingestion — batch/orchestration** (4 pts) | Prefect DAG with 4 chained steps (ingest → load → dbt transform → dbt test); weekly cron schedule via `deploy.py` | `flows/pipeline_dag.py`, `flows/deploy.py` |
-| 4 | **Data ingestion — stream** (4 pts) | Kafka producer (Socrata API → topic) + consumer (topic → BigQuery); Kafka + Zookeeper in Docker Compose | `streaming/producer.py`, `streaming/consumer.py`, `docker-compose.yml` |
-| 5 | **Data warehouse** (4 pts) | BigQuery raw table partitioned by date (monthly) + clustered by primary_type/district; dbt core tables with partitioning, clustering, and search indexes; documented rationale per table | `flows/gcs_to_bq.py`, `dbt/models/core/*.sql`, README § DWH Optimization |
-| 6 | **Transformations** (4 pts) | dbt staging view + 2 core tables (fact + dim); 12 data quality tests (not_null, unique) in `schema.yml`; dbt test step in DAG | `dbt/models/`, `dbt/models/*/schema.yml` |
-| 7 | **Dashboard** (4 pts) | 4 KPI metrics + 5 chart tiles (bar, horizontal bar, line, bar+table, bar); 2 calculated fields (arrest rate %, YoY % change); interactive filters | `dashboard/app.py` |
-| 8 | **Reproducibility** (4 pts) | README with step-by-step instructions; Makefile with all commands; `.env.example` template; Docker Compose for all services; `.gitignore` excludes secrets/data | README, `Makefile`, `.env.example`, `docker-compose.yml` |
+1. **Ingests** 8.5 M+ Chicago crime records via a Prefect-orchestrated batch pipeline and a Kafka streaming pipeline.
+2. **Stores** raw and transformed data in Google Cloud Storage and BigQuery, with Terraform-managed infrastructure.
+3. **Transforms** data using dbt (staging view + fact/dim tables) with partitioning, clustering, and 12 automated quality tests.
+4. **Visualises** crime trends through an interactive Streamlit dashboard with KPI metrics, temporal charts, and district breakdowns.
+5. **Reproduces** end-to-end with a single Makefile, Docker Compose, `.env.example`, and this README.
