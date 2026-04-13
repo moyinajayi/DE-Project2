@@ -1,7 +1,7 @@
 name: "chicago_crime"
 version: "1.0.0"
 
-profile: "default"
+profile: "chicago_crime"
 
 model-paths: ["models"]
 analysis-paths: ["analyses"]

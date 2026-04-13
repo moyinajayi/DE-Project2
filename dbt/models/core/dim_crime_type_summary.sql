@@ -25,4 +25,3 @@ SELECT
 
 FROM {{ ref('stg_chicago_crime') }}
 GROUP BY crime_type
-ORDER BY total_incidents DESC

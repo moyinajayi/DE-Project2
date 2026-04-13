@@ -17,6 +17,7 @@ venv/
 dbt/target/
 dbt/dbt_packages/
 dbt/logs/
+dbt/.user.yml
 
 # Streamlit secrets (actual)
 dashboard/.streamlit/secrets.toml
