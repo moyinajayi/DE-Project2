@@ -30,15 +30,16 @@ st.markdown(
 
 @st.cache_resource
 def get_bq_client():
-    credentials = service_account.Credentials.from_service_account_file(
-        st.secrets["gcp"]["credentials_path"],
+    creds_info = dict(st.secrets["gcp_service_account"])
+    credentials = service_account.Credentials.from_service_account_info(
+        creds_info,
         scopes=["https://www.googleapis.com/auth/bigquery"],
     )
-    return bigquery.Client(credentials=credentials, project=st.secrets["gcp"]["project_id"])
+    return bigquery.Client(credentials=credentials, project=creds_info["project_id"])
 
 
 client = get_bq_client()
-project_id = st.secrets["gcp"]["project_id"]
+project_id = dict(st.secrets["gcp_service_account"])["project_id"]
 
 
 @st.cache_data(ttl=3600)
