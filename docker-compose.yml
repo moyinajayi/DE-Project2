@@ -1,0 +1,106 @@
+version: "3.9"
+
+services:
+  # ── Kafka Infrastructure ──────────────────────────────────────────────
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.0
+    container_name: chicago-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: chicago-kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+  # ── Full Batch Pipeline DAG ──────────────────────────────────────────
+  pipeline:
+    build: .
+    container_name: chicago-crime-pipeline
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/creds/gcpserviceacccountcreds.json
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID}
+    volumes:
+      - ./creds:/app/creds:ro
+      - ./data:/app/data
+    command: python flows/pipeline_dag.py
+
+  # ── Batch: Ingest to GCS ─────────────────────────────────────────────
+  ingest:
+    build: .
+    container_name: chicago-crime-ingest
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/creds/gcpserviceacccountcreds.json
+    volumes:
+      - ./creds:/app/creds:ro
+      - ./data:/app/data
+    command: python flows/ingest_to_gcs.py
+
+  # ── Batch: GCS to BigQuery ───────────────────────────────────────────
+  load-bq:
+    build: .
+    container_name: chicago-crime-load-bq
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/creds/gcpserviceacccountcreds.json
+    volumes:
+      - ./creds:/app/creds:ro
+      - ./data:/app/data
+    command: python flows/gcs_to_bq.py
+
+  # ── dbt transformations ──────────────────────────────────────────────
+  dbt:
+    build: .
+    container_name: chicago-crime-dbt
+    working_dir: /app/dbt
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/creds/gcpserviceacccountcreds.json
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID}
+    volumes:
+      - ./creds:/app/creds:ro
+    command: dbt run --profiles-dir .
+
+  # ── Streaming: Kafka Producer ────────────────────────────────────────
+  kafka-producer:
+    build: .
+    container_name: chicago-crime-producer
+    depends_on:
+      - kafka
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+    command: python streaming/producer.py
+
+  # ── Streaming: Kafka Consumer -> BigQuery ────────────────────────────
+  kafka-consumer:
+    build: .
+    container_name: chicago-crime-consumer
+    depends_on:
+      - kafka
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/creds/gcpserviceacccountcreds.json
+      - BQ_TABLE=chicago_crime.chicago_crime_stream
+    volumes:
+      - ./creds:/app/creds:ro
+    command: python streaming/consumer.py
+
+  # ── Streamlit Dashboard ──────────────────────────────────────────────
+  dashboard:
+    build: .
+    container_name: chicago-crime-dashboard
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./creds:/app/creds:ro
+      - ./dashboard/.streamlit:/app/dashboard/.streamlit:ro
+    command: streamlit run dashboard/app.py --server.port=8501 --server.address=0.0.0.0
