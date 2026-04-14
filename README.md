@@ -96,9 +96,20 @@ The Streamlit dashboard provides **6 visual elements** with interactive sidebar 
 
 > **Screenshot:** After running `make dashboard`, the Streamlit app opens at `http://localhost:8501`.
 
-![Dashboard Screenshot](images/dashboard_screenshot.png)
+You can also view the live dashboard on Streamlit Cloud: [https://de-project2-chicago-data.streamlit.app/](https://de-project2-chicago-data.streamlit.app/)
 
-*The dashboard shows 4 KPI metrics at the top (Total Incidents, Total Arrests, Arrest Rate %, YoY Change %), followed by interactive charts for crime distribution, arrest rates, monthly trends, year-over-year totals, and top districts. Sidebar filters allow drill-down by crime type and year range.*
+The dashboard shows 4 KPI metrics at the top (Total Incidents, Total Arrests, Arrest Rate %, YoY Change %)
+![Dashboard Screenshot](images/dashboard_kpi_crime_distribution.png)
+
+*followed by interactive charts for crime distribution, arrest rates, monthly trends, year-over-year totals, and top districts. Sidebar filters allow drill-down by crime type and year range.*
+
+![Crime Distribution](images/Crimetrends.png)
+
+![Crime Distribution](images/Crime_volume.png)
+
+![Crime Distribution](images/YOY_Crime_totals.png)
+
+
 
 ## Data Warehouse Optimization
 
@@ -248,7 +259,8 @@ make stream-consume    # Kafka → BigQuery streaming table
 ```bash
 mkdir -p dashboard/.streamlit
 cp dashboard/.streamlit/secrets.toml.example dashboard/.streamlit/secrets.toml
-# Edit secrets.toml with your project ID and credentials path
+# Edit secrets.toml — paste your full GCP service account JSON key
+# under the [gcp_service_account] section (see secrets.toml.example)
 
 # Docker:
 docker compose up dashboard
