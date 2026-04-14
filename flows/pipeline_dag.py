@@ -13,8 +13,8 @@ from pathlib import Path
 
 from prefect import flow, task
 
-from ingest_to_gcs import ingest_to_gcs
-from gcs_to_bq import gcs_to_bq
+from flows.ingest_to_gcs import ingest_to_gcs
+from flows.gcs_to_bq import gcs_to_bq
 
 
 def _resolve_dbt_dir() -> str:

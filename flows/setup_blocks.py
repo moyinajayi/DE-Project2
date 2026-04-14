@@ -10,12 +10,16 @@ import os
 from prefect_gcp import GcpCredentials
 from prefect_gcp.cloud_storage import GcsBucket
 
-BUCKET_NAME = "vancouver-crime-data-95cf2209"
-PROJECT_ID = "project-95cf2209-f1e7-4545-a0c"
+BUCKET_NAME = os.environ.get("GCS_BUCKET_NAME")
+PROJECT_ID = os.environ.get("GCP_PROJECT_ID")
 CREDENTIALS_PATH = os.environ.get(
     "GOOGLE_APPLICATION_CREDENTIALS",
     os.path.join(os.path.dirname(__file__), "..", "creds", "gcpserviceacccountcreds.json"),
 )
+if not BUCKET_NAME:
+    raise ValueError("GCS_BUCKET_NAME environment variable must be set")
+if not PROJECT_ID:
+    raise ValueError("GCP_PROJECT_ID environment variable must be set")
 
 
 def create_gcp_credentials_block():

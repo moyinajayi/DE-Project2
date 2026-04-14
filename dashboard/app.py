@@ -17,7 +17,7 @@ from google.oauth2 import service_account
 
 st.set_page_config(
     page_title="Chicago Crime Dashboard",
-    page_icon="🔍",
+    page_icon="�",
     layout="wide",
 )
 
@@ -109,9 +109,9 @@ yearly = (
     .sum()
     .sort_index()
 )
-if len(yearly) >= 2:
+if len(yearly) >= 3:
     last_year = yearly.iloc[-2]  # last full year (current year may be partial)
-    prev_year = yearly.iloc[-3] if len(yearly) >= 3 else yearly.iloc[-2]
+    prev_year = yearly.iloc[-3]
     yoy_change = round((last_year - prev_year) / prev_year * 100, 1) if prev_year else 0
 else:
     yoy_change = 0

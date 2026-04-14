@@ -92,6 +92,14 @@ The Streamlit dashboard provides **6 visual elements** with interactive sidebar 
 | 4 | Year-over-Year Crime Totals | Bar + Table | Annual totals with computed YoY % change and arrest rate % columns |
 | 5 | Top Districts by Crime Volume | Bar chart | Top 15 districts ranked by incident count, with arrest rate in detail view |
 
+## Dashboard Preview
+
+> **Screenshot:** After running `make dashboard`, the Streamlit app opens at `http://localhost:8501`.
+
+![Dashboard Screenshot](images/dashboard_screenshot.png)
+
+*The dashboard shows 4 KPI metrics at the top (Total Incidents, Total Arrests, Arrest Rate %, YoY Change %), followed by interactive charts for crime distribution, arrest rates, monthly trends, year-over-year totals, and top districts. Sidebar filters allow drill-down by crime type and year range.*
+
 ## Data Warehouse Optimization
 
 BigQuery tables use three optimization strategies: **partitioning**, **clustering**, and **search indexes**.
@@ -134,7 +142,7 @@ A `Makefile` is provided for convenience. Run `make help` to see all available c
 ```bash
 # 1. Clone and configure
 git clone https://github.com/moyinajayi/DE-Project2.git && cd DE-Project2
-cp .env.example .env              # edit with your GCP project ID
+cp .env.example .env              # edit with your GCP project ID, bucket name, and creds path
 mkdir -p creds
 cp /path/to/service-account.json creds/service-account.json
 
@@ -178,8 +186,19 @@ terraform apply
 
 ```bash
 cp .env.example .env
-# Edit .env with your GCP project ID
+```
 
+Edit `.env` with your actual values:
+
+```dotenv
+GCP_PROJECT_ID=your-gcp-project-id
+GCS_BUCKET_NAME=your-unique-bucket-name
+GOOGLE_APPLICATION_CREDENTIALS=creds/service-account.json
+```
+
+Place your GCP service account key:
+
+```bash
 mkdir -p creds
 cp /path/to/your/service-account.json creds/service-account.json
 ```
@@ -188,7 +207,10 @@ cp /path/to/your/service-account.json creds/service-account.json
 
 ```bash
 pip install -r requirements.txt
-# Edit flows/setup_blocks.py with your bucket name and project ID
+
+# Ensure GCP_PROJECT_ID, GCS_BUCKET_NAME, and GOOGLE_APPLICATION_CREDENTIALS
+# are set in your environment (loaded from .env or exported)
+source .env   # or: export $(grep -v '^#' .env | xargs)
 python flows/setup_blocks.py
 ```
 
@@ -243,6 +265,7 @@ streamlit run dashboard/app.py
 │   ├── variables.tf
 │   └── outputs.tf
 ├── flows/                  # Prefect batch orchestration
+│   ├── __init__.py         # Package init
 │   ├── pipeline_dag.py     # Parent DAG — chains all steps in order
 │   ├── deploy.py           # Register scheduled deployment with Prefect
 │   ├── ingest_to_gcs.py    # Step 1: Download CSV → clean → Parquet → GCS
@@ -271,5 +294,6 @@ streamlit run dashboard/app.py
 ├── Makefile                # Quick commands: make pipeline, make stream-up, etc.
 ├── requirements.txt
 ├── .env.example            # Template for environment variables
+├── .gitignore
 └── README.md
 ```
